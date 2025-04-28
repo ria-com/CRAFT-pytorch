@@ -187,8 +187,8 @@ class CraftTrtInference:
     def __call__(self, images: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         if images.ndim != 4:
             raise ValueError("Очікую тензор (N,3,H,W)")
-        if images.dtype not in (np.float32, np.float16):
-            images = images.astype(np.float32) / 255.0
+        #if images.dtype not in (np.float32, np.float16):
+        #    images = images.astype(np.float32) / 255.0
         outputs = self.runner({"images": images})
         return outputs["regions"], outputs["affinity"]
 
@@ -252,23 +252,10 @@ if __name__ == "__main__":
     reg, aff = craft_inf(x)
     score_text = reg[0, :, :, 0]
     score_link = reg[0, :, :, 1]
-    print("score_link", score_link.shape, score_link.min(), score_link.max())
-    print(f"CRAFT batch1 latency: {(time.time()-t0)*1e3:.1f} ms")
-    print("reg", reg.shape)
-    print("aff", aff.shape)
-
-
-    # # 2. RefineNet
-    #craft_y = np.transpose(reg, (0, 2, 3, 1)).copy()
-    #h2, w2 = reg.shape[-2], reg.shape[-1]
-    #craft_y = np.transpose(reg, (0, 2, 3, 1))  # (N,H/2,W/2,2)
-    #features = np.random.rand(1, 32, h2, w2).astype(np.float16)  # demo
 
     t0 = time.time()
     y_refiner = refine_inf(reg, aff)
     score_link = y_refiner[0, :, :, 0]
-    print(f"RefineNet latency: {(time.time()-t0)*1e3:.1f} ms")
-    print("refined", score_link.shape)
 
     low_text = 0.4
     link_threshold = 0.4
@@ -276,11 +263,7 @@ if __name__ == "__main__":
     poly = False
     score_text = score_text.astype(np.float32)
     score_link = score_link.astype(np.float32)
-    print("score_text", score_text.shape, score_text.min(), score_text.max(), score_text.dtype)
-    print("score_link", score_link.shape, score_link.min(), score_link.max(), score_link.dtype)
-    print("text_threshold, link_threshold, low_text, poly", text_threshold, link_threshold, low_text, poly)
-    print("text_threshold, link_threshold, low_text, poly", type(text_threshold),
-          type(link_threshold), type(low_text), type(poly))
+
     boxes, polys = craft_utils.getDetBoxes(score_text, score_link, text_threshold, link_threshold, low_text, poly)
     # coordinate adjustment
     boxes = craft_utils.adjustResultCoordinates(boxes, ratio_w, ratio_h)
@@ -297,10 +280,8 @@ if __name__ == "__main__":
     result_folder = './result/'
     filename, file_ext = os.path.splitext(os.path.basename(image_path))
     mask_file = result_folder + "/trt_res_" + filename + '_mask.jpg'
-    print("ret_score_text", ret_score_text.shape, ret_score_text.dtype)
     cv2.imwrite(mask_file, ret_score_text)
 
-    print("image", image.shape, image.dtype)
     file_utils.saveResult(image_path, image[:, :, ::-1], polys, dirname=result_folder)
 
     print("elapsed time : {}s".format(time.time() - t))
